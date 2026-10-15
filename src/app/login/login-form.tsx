@@ -38,8 +38,8 @@ export function LoginForm() {
   return (
     <main className="grid min-h-dvh place-items-center px-4 py-10">
       <div className="w-full max-w-sm">
-        <div className="flex items-center gap-2.5">
-          <Logo href="/login" compact />
+        <div className="flex items-end gap-3">
+          <Logo href="/login" className="h-12" />
           <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-bold tracking-wider text-bg uppercase">Admin</span>
         </div>
         <h1 className="mt-6 text-2xl font-bold">Sign in</h1>

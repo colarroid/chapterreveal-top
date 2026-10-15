@@ -82,7 +82,12 @@ export function AdminHeader({ email }: { email: string }) {
   return (
     <header className="flex h-16 shrink-0 items-center gap-4 border-b border-line bg-bg px-4">
       <span className="flex items-center gap-2.5">
-        <Logo href="/" compact />
+        <span className="sm:hidden">
+          <Logo href="/" variant="icon" />
+        </span>
+        <span className="hidden sm:inline-flex">
+          <Logo href="/" variant="header" />
+        </span>
         {/* Unmistakably not the church console. */}
         <span className="rounded-full bg-ink px-2.5 py-1 text-[11px] font-bold tracking-wider text-bg uppercase">Admin</span>
       </span>
