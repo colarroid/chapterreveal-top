@@ -5,7 +5,6 @@ import { Translations, type ListItem } from "./translations";
 
 export const metadata = { title: "Translations" };
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? "";
 const storageUrl = (id: string, version: number) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/bibles/${id}/v${version}.json`;
 
 export default async function TranslationsPage() {
@@ -27,11 +26,16 @@ export default async function TranslationsPage() {
     (orderRows ?? []) as OrderRow[],
   ).map(({ order, ...t }) => ({ ...t, hidden: t.added ? !t.added.published : !!order?.hidden }));
 
-  // Built-in text is served by the main app; uploads by Supabase Storage.
-  const reader: ReaderTranslation[] = [
-    ...BUILT_IN_TRANSLATIONS.map((t) => ({ ...t, url: `${APP_URL}/bibles/${t.id}.json` })),
-    ...added.map((t) => ({ id: t.id, short: t.short, name: t.name, url: storageUrl(t.id, t.version), hidden: !t.published })),
-  ];
+  // The reader lists them in the same order. Built-in text comes from the
+  // main app through this site's server (see api/bibles); uploads straight
+  // from Supabase Storage.
+  const reader: ReaderTranslation[] = items.map((t) => ({
+    id: t.id,
+    short: t.short,
+    name: t.name,
+    url: t.added ? storageUrl(t.id, t.added.version) : `/api/bibles/${t.id}`,
+    hidden: t.hidden,
+  }));
 
   return (
     <div className="grid gap-4 px-4 py-8 sm:px-8 lg:grid-cols-[minmax(0,1fr)_minmax(320px,400px)] lg:items-start">

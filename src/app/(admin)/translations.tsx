@@ -80,7 +80,10 @@ export function Translations({ items: initial, orderReady }: { items: ListItem[]
     if (error) {
       setItems(items);
       setError(error.message);
+      return;
     }
+    // The reader on the right lists translations in this order too.
+    router.refresh();
   }
 
   async function setHidden(t: ListItem, hidden: boolean) {
