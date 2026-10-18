@@ -5,7 +5,6 @@ import { Translations, type ListItem } from "./translations";
 
 export const metadata = { title: "Translations" };
 
-const storageUrl = (id: string, version: number) => `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/bibles/${id}/v${version}.json`;
 
 export default async function TranslationsPage() {
   // The layout has already checked this is a platform admin.
@@ -26,14 +25,14 @@ export default async function TranslationsPage() {
     (orderRows ?? []) as OrderRow[],
   ).map(({ order, ...t }) => ({ ...t, hidden: t.added ? !t.added.published : !!order?.hidden }));
 
-  // The reader lists them in the same order. Built-in text comes from the
-  // main app through this site's server (see api/bibles); uploads straight
-  // from Supabase Storage.
+  // The reader lists them in the same order. All text comes through this
+  // site's server (api/bibles): built-in from the main app, added ones from
+  // the private bucket with the admin's sign-in.
   const reader: ReaderTranslation[] = items.map((t) => ({
     id: t.id,
     short: t.short,
     name: t.name,
-    url: t.added ? storageUrl(t.id, t.added.version) : `/api/bibles/${t.id}`,
+    url: t.added ? `/api/bibles/${t.id}?v=${t.added.version}` : `/api/bibles/${t.id}`,
     hidden: t.hidden,
   }));
 
