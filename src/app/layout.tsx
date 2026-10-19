@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono, Source_Serif_4 } from "next/font/google";
+import { Analytics } from "@/components/analytics";
 import { ConfirmHost } from "@/components/confirm";
 import { APP_NAME } from "@/lib/brand";
 import { themeScript } from "@/lib/theme-script";
@@ -25,6 +26,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
       <body className={`${ui.variable} ${mono.variable} ${serif.variable} antialiased`}>
         {children}
         <ConfirmHost />
+        <Analytics />
       </body>
     </html>
   );
