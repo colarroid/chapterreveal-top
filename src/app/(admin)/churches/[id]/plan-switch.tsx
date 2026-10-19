@@ -19,10 +19,10 @@ export function PlanSwitch({ churchId, churchName, plan }: { churchId: string; c
     if (next === plan) return;
     const ok = await confirmDialog(
       next === "paid"
-        ? { title: `Move ${churchName} to the Paid plan?`, body: "No limits: as many pictures, videos, gradients and picture or video slides as they like, and slides are kept until deleted.", confirmLabel: "Make paid" }
+        ? { title: `Move ${churchName} to the Paid plan?`, body: "Video slides, 6 pictures on a slide, and no limits on pictures, videos, gradients or slides; slides are kept until deleted.", confirmLabel: "Make paid" }
         : {
             title: `Move ${churchName} to the Free plan?`,
-            body: "What they already have stays, but they can't add beyond the Free plan's 5 pictures, 2 videos, 10 gradients and 10 picture or video slides, and their picture and video slides are deleted after 7 days.",
+            body: "What they already have stays, but they can't add beyond the Free plan's 5 pictures, 2 videos, 10 gradients and 10 picture slides (3 pictures each, no video slides), deleted after 7 days.",
             confirmLabel: "Make free",
             danger: true,
           },
