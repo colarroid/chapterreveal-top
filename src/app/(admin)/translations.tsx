@@ -297,6 +297,14 @@ function TranslationForm({
     const now = new Date().toISOString();
     const version = report ? (existing?.version ?? 0) + 1 : (existing?.version ?? 1);
 
+    // A fresh sign-in first: a page left open (or a computer that slept) can
+    // still hold an expired one, and the upload would fail with "exp claim".
+    const { error: authErr } = await supabase.auth.refreshSession();
+    if (authErr) {
+      setSaving(false);
+      return setError("Your sign-in has expired. Refresh the page, sign in again, then add the translation.");
+    }
+
     // New text first, then the row that points at it: a church never sees a
     // row whose file isn't there yet.
     if (report) {
