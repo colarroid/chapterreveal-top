@@ -456,6 +456,7 @@ function ReportView({ report }: { report: ImportReport }) {
       <div className="flex flex-wrap gap-2">
         <Chip tone="ok">{report.verses.toLocaleString()} verses</Chip>
         <Chip>{report.booksFound} of 66 books</Chip>
+        {report.deuteroFound > 0 && <Chip>+ {report.deuteroFound} Deuterocanonical</Chip>}
         <Chip>{report.formats.map((f) => f.toUpperCase()).join(", ")}</Chip>
         {report.gaps > 0 && <Chip tone={manyGaps ? "warn" : "neutral"}>{report.gaps.toLocaleString()} gaps</Chip>}
       </div>
