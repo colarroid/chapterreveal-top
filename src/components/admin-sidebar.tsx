@@ -1,10 +1,11 @@
 "use client";
 
-import { Building2, LibraryBig, LoaderCircle, Music, Palette, Users, type LucideIcon } from "lucide-react";
+import { Building2, LayoutDashboard, LibraryBig, LoaderCircle, Music, Palette, Users, type LucideIcon } from "lucide-react";
 import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 
 const SECTIONS: { href: string; label: string; icon: LucideIcon; soon?: boolean }[] = [
+  { href: "/overview", label: "Overview", icon: LayoutDashboard },
   { href: "/", label: "Translations", icon: LibraryBig },
   { href: "/lyrics", label: "Lyrics", icon: Music },
   { href: "/design", label: "Design", icon: Palette },
