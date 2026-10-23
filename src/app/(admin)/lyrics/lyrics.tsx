@@ -20,7 +20,16 @@ export interface SharedSong {
   author: string;
   firstLine: string;
   source: string;
+  /** The church that added it; null for the shared library. */
+  church: string | null;
 }
+
+type Which = "all" | "shared" | "churches";
+const WHICH: { value: Which; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "shared", label: "Shared library" },
+  { value: "churches", label: "Churches' songs" },
+];
 
 interface FullSong extends SongFields {
   id: string;
@@ -40,8 +49,11 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
   const [pane, setPane] = useState<Pane>({ kind: "empty" });
   const [query, setQuery] = useState("");
   const [lyricHits, setLyricHits] = useState<Set<string> | null>(null);
+  const [which, setWhich] = useState<Which>("all");
+  const shown = useMemo(() => (which === "all" ? songs : songs.filter((s) => (which === "shared" ? !s.church : !!s.church))), [songs, which]);
+  const churchSongs = songs.filter((s) => s.church).length;
 
-  const folded = useMemo(() => songs.map((s) => ({ s, key: fold(`${s.title} ${s.author} ${s.firstLine}`) })), [songs]);
+  const folded = useMemo(() => shown.map((s) => ({ s, key: fold(`${s.title} ${s.author} ${s.firstLine} ${s.church ?? ""}`) })), [shown]);
 
   // Titles here as you type; every song's words on the server after a pause.
   useEffect(() => {
@@ -52,7 +64,7 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
     }
     const t = setTimeout(async () => {
       const pattern = `%${q.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
-      const { data } = await supabaseBrowser().from("songs").select("id").is("church_id", null).ilike("body", pattern).limit(300);
+      const { data } = await supabaseBrowser().from("songs").select("id").ilike("body", pattern).limit(300);
       setLyricHits(new Set((data ?? []).map((r) => r.id as string)));
     }, 250);
     return () => clearTimeout(t);
@@ -60,9 +72,9 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
 
   const matches = useMemo(() => {
     const q = fold(query.trim());
-    if (!q) return songs;
+    if (!q) return shown;
     return folded.filter(({ s, key }) => key.includes(q) || lyricHits?.has(s.id)).map(({ s }) => s);
-  }, [folded, songs, query, lyricHits]);
+  }, [folded, shown, query, lyricHits]);
 
   async function save(fields: SongFields, existing: FullSong | null): Promise<string | void> {
     const row = { ...fields, body: songBody(fields.slides), first_line: firstLine(fields.slides), updated_at: new Date().toISOString() };
@@ -82,7 +94,7 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
     <div className="space-y-4">
       <PageHead
         title="Lyrics"
-        description={`The shared library: ${songs.length.toLocaleString()} ${songs.length === 1 ? "song" : "songs"}, seen by every church. Churches can also add their own.`}
+        description={`${songs.length.toLocaleString()} ${songs.length === 1 ? "song" : "songs"} on the platform: ${(songs.length - churchSongs).toLocaleString()} in the shared library, ${churchSongs.toLocaleString()} added by churches. Every church sees them all.`}
         right={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setPane({ kind: "import" })}>
@@ -97,8 +109,21 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
 
       <div className="grid gap-4 lg:h-[calc(100dvh-13rem)] lg:min-h-[520px] lg:grid-cols-[minmax(280px,380px)_minmax(0,1fr)]">
         <aside className="flex min-h-[420px] flex-col rounded-lg bg-surface lg:min-h-0">
-          <div className="p-3">
-            <SearchBox value={query} onChange={setQuery} placeholder="Search titles and lyrics" />
+          <div className="space-y-2 p-3">
+            <SearchBox value={query} onChange={setQuery} placeholder="Search titles, lyrics and churches" />
+            <div className="inline-flex rounded-full bg-surface-2 p-0.5" role="group" aria-label="Which songs">
+              {WHICH.map((w) => (
+                <button
+                  key={w.value}
+                  type="button"
+                  aria-pressed={which === w.value}
+                  onClick={() => setWhich(w.value)}
+                  className={`h-7 rounded-full px-3 text-xs font-bold transition ${which === w.value ? "bg-bg text-ink shadow-card" : "text-muted hover:text-ink"}`}
+                >
+                  {w.label}
+                </button>
+              ))}
+            </div>
           </div>
           <ol className="min-h-0 flex-1 overflow-y-auto px-1.5 pb-2">
             {matches.slice(0, SHOWN).map((s) => (
@@ -106,7 +131,7 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
             ))}
             {matches.length > SHOWN && <li className="px-3 py-3 text-center text-xs text-muted">{(matches.length - SHOWN).toLocaleString()} more. Search to narrow the list.</li>}
             {songs.length > 0 && matches.length === 0 && <li className="px-3 py-8 text-center text-sm text-muted">No songs match.</li>}
-            {songs.length === 0 && <li className="px-4 py-10 text-center text-sm text-muted">No shared songs yet. Import a VideoPsalm songbook to start.</li>}
+            {shown.length === 0 && <li className="px-4 py-10 text-center text-sm text-muted">No songs here yet.</li>}
           </ol>
         </aside>
 
@@ -115,6 +140,7 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
             <SongView
               key={pane.id}
               id={pane.id}
+              church={songs.find((s) => s.id === pane.id)?.church ?? null}
               onEdit={(song) => setPane({ kind: "edit", song })}
               onDeleted={() => {
                 setPane({ kind: "empty" });
@@ -153,7 +179,10 @@ const Row = memo(function Row({ song, active, onOpen }: { song: SharedSong; acti
   return (
     <li>
       <button type="button" onClick={onOpen} className={`block w-full rounded-md px-3 py-2 text-left transition ${active ? "bg-surface-3" : "hover:bg-surface-2"}`}>
-        <span className="block truncate text-[15px] font-semibold">{song.title}</span>
+        <span className="flex items-center gap-2">
+          <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{song.title}</span>
+          {song.church && <span className="max-w-32 shrink-0 truncate text-[10px] font-bold tracking-wider text-faint uppercase">{song.church}</span>}
+        </span>
         <span className="block truncate text-xs text-muted">{song.firstLine || song.author || " "}</span>
       </button>
     </li>
@@ -174,7 +203,8 @@ function loadSong(id: string): Promise<FullSong | null> {
   return p;
 }
 
-function SongView({ id, onEdit, onDeleted }: { id: string; onEdit: (s: FullSong) => void; onDeleted: () => void }) {
+/** `church`: the church that added it (its songs are theirs: read here, not edited); null for the shared library. */
+function SongView({ id, church, onEdit, onDeleted }: { id: string; church: string | null; onEdit: (s: FullSong) => void; onDeleted: () => void }) {
   const [song, setSong] = useState<FullSong | null | undefined>(undefined);
   const [deleting, setDeleting] = useState(false);
   useEffect(() => {
@@ -217,12 +247,18 @@ function SongView({ id, onEdit, onDeleted }: { id: string; onEdit: (s: FullSong)
           <p className="mt-1 text-sm text-muted">{[song.author, song.ccli_number && `CCLI ${song.ccli_number}`, `${song.slides.length} slides`].filter(Boolean).join(" · ")}</p>
           {song.copyright && <p className="mt-0.5 text-xs text-faint">{song.copyright}</p>}
         </div>
-        <Button variant="secondary" size="sm" onClick={() => onEdit(song)}>
-          <Pencil size={13} /> Edit
-        </Button>
-        <IconButton label="Delete song" onClick={remove} disabled={deleting} className="hover:text-negative">
-          {deleting ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}
-        </IconButton>
+        {church ? (
+          <Chip>Added by {church}</Chip>
+        ) : (
+          <>
+            <Button variant="secondary" size="sm" onClick={() => onEdit(song)}>
+              <Pencil size={13} /> Edit
+            </Button>
+            <IconButton label="Delete song" onClick={remove} disabled={deleting} className="hover:text-negative">
+              {deleting ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}
+            </IconButton>
+          </>
+        )}
       </div>
       <ol className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2 overflow-y-auto p-4">
         {song.slides.map((s, i) => (
