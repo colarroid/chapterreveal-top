@@ -5,8 +5,8 @@ import Link, { useLinkStatus } from "next/link";
 import { usePathname } from "next/navigation";
 
 const SECTIONS: { href: string; label: string; icon: LucideIcon; soon?: boolean }[] = [
-  { href: "/overview", label: "Overview", icon: LayoutDashboard },
-  { href: "/", label: "Translations", icon: LibraryBig },
+  { href: "/", label: "Overview", icon: LayoutDashboard },
+  { href: "/translations", label: "Translations", icon: LibraryBig },
   { href: "/lyrics", label: "Lyrics", icon: Music },
   { href: "/design", label: "Design", icon: Palette },
   { href: "/churches", label: "Churches", icon: Building2 },
