@@ -1,6 +1,6 @@
 "use client";
 
-import { FileUp, LoaderCircle, Music, Pencil, Plus, Trash2, X } from "lucide-react";
+import { FileUp, GitCompare, LoaderCircle, Music, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { confirmDialog } from "@/components/confirm";
@@ -13,6 +13,7 @@ import { nearCopies, notSongReason } from "@/lib/songs/review";
 import { LockedSongbookError, readSongbookFile, type ImportedSong, type SongbookRead } from "@/lib/songs/videopsalm";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useLeaveWarning } from "@/lib/use-leave-warning";
+import { ReviewPanel, type SongReview } from "./review";
 
 export interface SharedSong {
   id: string;
@@ -35,7 +36,7 @@ interface FullSong extends SongFields {
   id: string;
 }
 
-type Pane = { kind: "empty" } | { kind: "view"; id: string } | { kind: "edit"; song: FullSong | null } | { kind: "import" };
+type Pane = { kind: "empty" } | { kind: "view"; id: string } | { kind: "edit"; song: FullSong | null } | { kind: "import" } | { kind: "review" };
 
 const SHOWN = 300;
 const fold = (s: string) =>
@@ -44,7 +45,7 @@ const fold = (s: string) =>
     .replace(/\p{M}/gu, "")
     .toLowerCase();
 
-export function Lyrics({ songs }: { songs: SharedSong[] }) {
+export function Lyrics({ songs, reviews }: { songs: SharedSong[]; reviews: SongReview[] }) {
   const router = useRouter();
   const [pane, setPane] = useState<Pane>({ kind: "empty" });
   const [query, setQuery] = useState("");
@@ -97,6 +98,9 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
         description={`${songs.length.toLocaleString()} ${songs.length === 1 ? "song" : "songs"} on the platform: ${(songs.length - churchSongs).toLocaleString()} in the public library, ${churchSongs.toLocaleString()} in churches' own libraries. Churches search the public library and copy what they need.`}
         right={
           <div className="flex gap-2">
+            <Button variant={reviews.length ? "primary" : "secondary"} onClick={() => setPane({ kind: "review" })}>
+              <GitCompare size={15} /> Review{reviews.length ? ` (${reviews.length})` : ""}
+            </Button>
             <Button variant="secondary" onClick={() => setPane({ kind: "import" })}>
               <FileUp size={15} /> Import from VideoPsalm
             </Button>
@@ -158,6 +162,7 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
             />
           )}
           {pane.kind === "import" && <ImportPanel onClose={() => setPane({ kind: "empty" })} onDone={() => router.refresh()} />}
+          {pane.kind === "review" && <ReviewPanel reviews={reviews} onClose={() => setPane({ kind: "empty" })} onResolved={() => router.refresh()} />}
           {pane.kind === "empty" && (
             <div className="grid flex-1 place-items-center px-6 text-center">
               <div>

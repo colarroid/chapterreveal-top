@@ -1,6 +1,7 @@
 import { Notice } from "@/components/ui";
 import { supabaseServer } from "@/lib/supabase/server";
 import { Lyrics, type SharedSong } from "./lyrics";
+import type { SongReview } from "./review";
 
 export const metadata = { title: "Lyrics" };
 
@@ -33,9 +34,23 @@ export default async function LyricsPage() {
     if (!data || data.length < PAGE) break;
   }
 
+  // Church songs that look like a public one, for an admin to settle (migration 0032; none before it).
+  const { data: open } = await supabase
+    .from("song_reviews")
+    .select("id, church_song_id, public_song_id, church_id, similarity")
+    .is("resolved_at", null)
+    .order("created_at");
+  const reviews: SongReview[] = (open ?? []).map((r) => ({
+    id: r.id,
+    churchSongId: r.church_song_id,
+    publicSongId: r.public_song_id,
+    church: names.get(r.church_id) ?? "A church",
+    similarity: r.similarity,
+  }));
+
   return (
     <main className="w-full px-4 py-8 sm:px-8">
-      {error ? <Notice tone="error">Could not load songs: {error}. Has migration 0008 been run?</Notice> : <Lyrics songs={songs} />}
+      {error ? <Notice tone="error">Could not load songs: {error}. Has migration 0008 been run?</Notice> : <Lyrics songs={songs} reviews={reviews} />}
     </main>
   );
 }
