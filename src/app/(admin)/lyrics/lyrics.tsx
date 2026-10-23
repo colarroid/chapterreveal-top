@@ -20,14 +20,14 @@ export interface SharedSong {
   author: string;
   firstLine: string;
   source: string;
-  /** The church that added it; null for the shared library. */
+  /** The church that added it; null for the public library. */
   church: string | null;
 }
 
 type Which = "all" | "shared" | "churches";
 const WHICH: { value: Which; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "shared", label: "Shared library" },
+  { value: "shared", label: "Public library" },
   { value: "churches", label: "Churches' songs" },
 ];
 
@@ -94,7 +94,7 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
     <div className="space-y-4">
       <PageHead
         title="Lyrics"
-        description={`${songs.length.toLocaleString()} ${songs.length === 1 ? "song" : "songs"} on the platform: ${(songs.length - churchSongs).toLocaleString()} in the shared library, ${churchSongs.toLocaleString()} added by churches. Every church sees them all.`}
+        description={`${songs.length.toLocaleString()} ${songs.length === 1 ? "song" : "songs"} on the platform: ${(songs.length - churchSongs).toLocaleString()} in the public library, ${churchSongs.toLocaleString()} in churches' own libraries. Churches search the public library and copy what they need.`}
         right={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => setPane({ kind: "import" })}>
@@ -152,7 +152,7 @@ export function Lyrics({ songs }: { songs: SharedSong[] }) {
             <SongEditor
               key={pane.song?.id ?? "new"}
               initial={pane.song}
-              heading={pane.song ? "Edit shared song" : "Add a shared song"}
+              heading={pane.song ? "Edit public song" : "Add a public song"}
               onCancel={() => setPane(pane.song ? { kind: "view", id: pane.song.id } : { kind: "empty" })}
               onSave={(f) => save(f, pane.song)}
             />
@@ -203,7 +203,7 @@ function loadSong(id: string): Promise<FullSong | null> {
   return p;
 }
 
-/** `church`: the church that added it (its songs are theirs: read here, not edited); null for the shared library. */
+/** `church`: the church that added it (its songs are theirs: read here, not edited); null for the public library. */
 function SongView({ id, church, onEdit, onDeleted }: { id: string; church: string | null; onEdit: (s: FullSong) => void; onDeleted: () => void }) {
   const [song, setSong] = useState<FullSong | null | undefined>(undefined);
   const [deleting, setDeleting] = useState(false);
@@ -219,7 +219,7 @@ function SongView({ id, church, onEdit, onDeleted }: { id: string; church: strin
     if (!song) return;
     const ok = await confirmDialog({
       title: `Delete "${song.title}"?`,
-      body: "It's removed from the shared library, so every church loses it. This can't be undone.",
+      body: "It's removed from the public library. Churches that copied it keep their copies. This can't be undone.",
       confirmLabel: "Delete",
       danger: true,
     });
@@ -276,7 +276,7 @@ function SongView({ id, church, onEdit, onDeleted }: { id: string; church: strin
 }
 
 // ---------------------------------------------------------------------------
-// VideoPsalm import, into the shared library. After the files are read, a
+// VideoPsalm import, into the public library. After the files are read, a
 // review: what isn't a song and which songs are near-copies start unticked,
 // each with its reason, and anything can be ticked or unticked by hand.
 
@@ -418,7 +418,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <div className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
         <div className="flex-1">
           <h2 className="text-xl font-bold">Import from VideoPsalm</h2>
-          <p className="text-sm text-muted">Into the shared library: every church will see these songs.</p>
+          <p className="text-sm text-muted">Into the public library: churches can find these songs and copy them.</p>
         </div>
         <IconButton label="Close" onClick={onClose} disabled={progress !== null}>
           <X size={18} />
@@ -546,7 +546,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
         {error && <Notice tone="error">{error}</Notice>}
         {result && (
           <Notice tone="ok">
-            Added {result.added.toLocaleString()} {result.added === 1 ? "song" : "songs"} to the shared library.
+            Added {result.added.toLocaleString()} {result.added === 1 ? "song" : "songs"} to the public library.
             {result.skipped > 0 && ` ${result.skipped.toLocaleString()} were already there.`}
           </Notice>
         )}
