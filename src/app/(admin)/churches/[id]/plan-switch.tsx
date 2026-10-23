@@ -8,8 +8,8 @@ import { supabaseBrowser } from "@/lib/supabase/client";
 
 type Plan = "free" | "paid";
 
-// Free: 2 projector backgrounds. Paid: no limit. (The main app and the
-// database hold the same numbers.)
+// Free or Paid. The main app (lib/plans.ts) and the database (plan_limit)
+// hold the actual numbers.
 export function PlanSwitch({ churchId, churchName, plan }: { churchId: string; churchName: string; plan: Plan }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
@@ -19,10 +19,10 @@ export function PlanSwitch({ churchId, churchName, plan }: { churchId: string; c
     if (next === plan) return;
     const ok = await confirmDialog(
       next === "paid"
-        ? { title: `Move ${churchName} to the Paid plan?`, body: "Video slides, 6 pictures on a slide, and no limits on pictures, videos, gradients or slides; slides are kept until deleted.", confirmLabel: "Make paid" }
+        ? { title: `Move ${churchName} to the Paid plan?`, body: "Video slides, unlimited presentations and pictures (6 on a slide), and no limits on backgrounds or gradients; pictures are kept until deleted.", confirmLabel: "Make paid" }
         : {
             title: `Move ${churchName} to the Free plan?`,
-            body: "What they already have stays, but they can't add beyond the Free plan's 5 pictures, 2 videos, 10 gradients and 10 picture slides (3 pictures each, no video slides), deleted after 7 days.",
+            body: "What they already have stays, but they can't add beyond the Free plan: 5 picture and 2 video backgrounds, 10 gradients, and 2 presentations of up to 4 pictures each (2 on a slide, kept 7 days), no video slides.",
             confirmLabel: "Make free",
             danger: true,
           },
@@ -52,7 +52,7 @@ export function PlanSwitch({ churchId, churchName, plan }: { churchId: string; c
           </button>
         ))}
       </div>
-      <span className="text-xs text-muted">{plan === "free" ? "2 projector backgrounds" : "Unlimited backgrounds"}</span>
+      <span className="text-xs text-muted">{plan === "free" ? "2 presentations, 4 pictures each, no video slides" : "No limits, video slides"}</span>
       {error && <Notice tone="error">{error}</Notice>}
     </div>
   );

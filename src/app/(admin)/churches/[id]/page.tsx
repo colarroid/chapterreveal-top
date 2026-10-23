@@ -6,6 +6,7 @@ import { Chip, Notice } from "@/components/ui";
 import { formatDate, formatDateTime, formatPlace, formatSeconds } from "@/lib/format";
 import { supabaseServer } from "@/lib/supabase/server";
 import { PlanSwitch } from "./plan-switch";
+import { SilenceSetting } from "./silence";
 
 interface Detail {
   church: {
@@ -85,7 +86,10 @@ export default async function ChurchPage({ params }: { params: Promise<{ id: str
         </p>
       </div>
 
-      <PlanSwitch churchId={church.id} churchName={church.name} plan={plan === "paid" ? "paid" : "free"} />
+      <div className="space-y-3">
+        <PlanSwitch churchId={church.id} churchName={church.name} plan={plan === "paid" ? "paid" : "free"} />
+        <SilenceSetting churchId={church.id} minutes={Number(church.settings.silence_end_minutes ?? 10)} />
+      </div>
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
         <Stat label="Members" value={members.length} />
