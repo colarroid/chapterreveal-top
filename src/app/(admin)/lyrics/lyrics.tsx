@@ -490,7 +490,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <div className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
         <div className="flex-1">
           <h2 className="text-xl font-bold">Import from VideoPsalm</h2>
-          <p className="text-sm text-muted">Into ReedArk's library: detection listens for every song, and churches add the ones they sing.</p>
+          <p className="text-sm text-muted">Into ReedArk&apos;s library: detection listens for every song, and churches add the ones they sing.</p>
         </div>
         <IconButton label="Close" onClick={onClose} disabled={progress !== null}>
           <X size={18} />
