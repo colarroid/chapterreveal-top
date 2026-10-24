@@ -283,7 +283,7 @@ function SongView({ id, churches, onEdit, onDeleted }: { id: string; churches: s
 }
 
 // ---------------------------------------------------------------------------
-// VideoPsalm import, into the public library. After the files are read, a
+// VideoPsalm import, into the library. After the files are read, a
 // review: what isn't a song and which songs are near-copies start unticked,
 // each with its reason, and anything can be ticked or unticked by hand.
 
@@ -490,7 +490,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       <div className="flex shrink-0 items-center gap-3 border-b border-line px-5 py-4">
         <div className="flex-1">
           <h2 className="text-xl font-bold">Import from VideoPsalm</h2>
-          <p className="text-sm text-muted">Into the public library: churches can find these songs and copy them.</p>
+          <p className="text-sm text-muted">Into ReedArk's library: detection listens for every song, and churches add the ones they sing.</p>
         </div>
         <IconButton label="Close" onClick={onClose} disabled={progress !== null}>
           <X size={18} />
@@ -578,7 +578,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 : view === "not-songs"
                   ? "Announcements, account numbers, introductions, notes and dated service sets. Skipped unless you tick them."
                   : view === "library"
-                    ? "Already in the public library, perhaps with small changes. Skipped unless you tick them; ticked, they go in as another copy."
+                    ? "Already in the library, perhaps with small changes. Skipped unless you tick them; ticked, they go in as another song. The church you choose below gets them either way."
                   : "Saved more than once with small edits. The fullest version is in “Will import”; tick another to keep it too."}
             </p>
             <ul className="max-h-[420px] divide-y divide-line overflow-y-auto rounded-lg bg-surface-2">
