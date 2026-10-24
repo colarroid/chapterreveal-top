@@ -9,7 +9,7 @@ import { SongEditor, type SongFields } from "@/components/song-editor";
 import { Button, Chip, IconButton, Notice } from "@/components/ui";
 import { cleanSlides } from "@/lib/songs/cleanup";
 import { firstLine, pairSingleLines, songBody, type SongSlide } from "@/lib/songs/songs";
-import { nearCopies, notSongReason } from "@/lib/songs/review";
+import { alreadyIn, nearCopies, notSongReason } from "@/lib/songs/review";
 import { LockedSongbookError, readSongbookFile, type ImportedSong, type SongbookRead } from "@/lib/songs/videopsalm";
 import { supabaseBrowser } from "@/lib/supabase/client";
 import { useLeaveWarning } from "@/lib/use-leave-warning";
@@ -295,10 +295,26 @@ interface ReviewItem {
   notSong: string | null;
   /** The fuller version this is a near-copy of. */
   copyOf: string | null;
+  /** The public library song it's already there as (perhaps with small changes). */
+  inLibrary: string | null;
   include: boolean;
 }
 
-type ReviewView = "import" | "not-songs" | "copies";
+type ReviewView = "import" | "not-songs" | "library" | "copies";
+
+const PAGE = 1000;
+
+/** Every public library song's title and words, to check an import against. */
+async function publicLibrary(): Promise<{ title: string; body: string }[]> {
+  const supabase = supabaseBrowser();
+  const out: { title: string; body: string }[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase.from("songs").select("title, body").is("church_id", null).order("id").range(from, from + PAGE - 1);
+    if (error) throw error;
+    out.push(...((data ?? []) as { title: string; body: string }[]));
+    if (!data || data.length < PAGE) return out;
+  }
+}
 
 function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => void }) {
   const input = useRef<HTMLInputElement>(null);
@@ -334,11 +350,22 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
     // Review across every file at once, so a song in two books counts once.
     const all = ok.flatMap((b) => b.songs.map((song) => ({ song, book: b.name })));
     const keep = nearCopies(all.map((x) => x.song));
+    // Songs the public library has already, saved again with small changes.
+    let there: (string | null)[] = all.map(() => null);
+    try {
+      there = alreadyIn(
+        all.map((x) => x.song),
+        await publicLibrary(),
+      );
+    } catch {
+      issues.push("Couldn't check which songs the library has already. Exact repeats are still skipped.");
+    }
     setItems(
       all.map(({ song, book }, i) => {
         const notSong = notSongReason(song);
+        const inLibrary = notSong ? null : there[i];
         const copyOf = keep[i] !== i ? all[keep[i]].song.title : null;
-        return { song, book, notSong, copyOf, include: !notSong && !copyOf };
+        return { song, book, notSong, copyOf, inLibrary, include: !notSong && !copyOf && !inLibrary };
       }),
     );
     setBooks(ok);
@@ -352,7 +379,8 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
     () => ({
       import: items.filter((x) => x.include).length,
       notSongs: items.filter((x) => x.notSong).length,
-      copies: items.filter((x) => !x.notSong && x.copyOf).length,
+      library: items.filter((x) => !x.notSong && x.inLibrary).length,
+      copies: items.filter((x) => !x.notSong && !x.inLibrary && x.copyOf).length,
     }),
     [items],
   );
@@ -361,7 +389,9 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
     const q = query.trim().toLowerCase();
     return items
       .map((x, i) => ({ x, i }))
-      .filter(({ x }) => (view === "import" ? x.include : view === "not-songs" ? !!x.notSong : !x.notSong && !!x.copyOf))
+      .filter(({ x }) =>
+        view === "import" ? x.include : view === "not-songs" ? !!x.notSong : view === "library" ? !x.notSong && !!x.inLibrary : !x.notSong && !x.inLibrary && !!x.copyOf,
+      )
       .filter(({ x }) => !q || x.song.title.toLowerCase().includes(q) || x.song.slides.some((s) => s.text.toLowerCase().includes(q)));
   }, [items, view, query]);
 
@@ -415,6 +445,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const VIEWS: { id: ReviewView; label: string; n: number }[] = [
     { id: "import", label: "Will import", n: counts.import },
     { id: "not-songs", label: "Not songs", n: counts.notSongs },
+    { id: "library", label: "Already in the library", n: counts.library },
     { id: "copies", label: "Near-copies", n: counts.copies },
   ];
 
@@ -509,7 +540,9 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
               {view === "import"
                 ? "Untick anything that shouldn't go in."
                 : view === "not-songs"
-                  ? "Announcements, account numbers, introductions and notes. Skipped unless you tick them."
+                  ? "Announcements, account numbers, introductions, notes and dated service sets. Skipped unless you tick them."
+                  : view === "library"
+                    ? "Already in the public library, perhaps with small changes. Skipped unless you tick them; ticked, they go in as another copy."
                   : "Saved more than once with small edits. The fullest version is in “Will import”; tick another to keep it too."}
             </p>
             <ul className="max-h-[420px] divide-y divide-line overflow-y-auto rounded-lg bg-surface-2">
@@ -521,7 +554,8 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
                       <span className="block truncate font-semibold">{x.song.title}</span>
                       <span className="block truncate text-xs text-muted">{firstLine(x.song.slides)}</span>
                       {x.notSong && <span className="mt-0.5 block text-xs text-warning">{x.notSong}</span>}
-                      {!x.notSong && x.copyOf && <span className="mt-0.5 block text-xs text-faint">Near-copy of “{x.copyOf}”</span>}
+                      {!x.notSong && x.inLibrary && <span className="mt-0.5 block text-xs text-faint">Already in the library as “{x.inLibrary}”</span>}
+                      {!x.notSong && !x.inLibrary && x.copyOf && <span className="mt-0.5 block text-xs text-faint">Near-copy of “{x.copyOf}”</span>}
                     </span>
                     <span className="shrink-0 text-xs text-faint tabular-nums">{x.song.slides.length} slides</span>
                   </label>

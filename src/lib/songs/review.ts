@@ -20,6 +20,9 @@ const PERSON_TITLE = /^(barr|engr|dr|prof|pastor|pst|rev|revd|mr|mrs|miss|bro|si
 const LINK = /https?:\/\/|www\.|\b[\w.+-]+@[\w-]+\.[\w.]+/i;
 // Nigerian account numbers (10 digits), phone numbers, bank words.
 const MONEY_OR_PHONE = /\b\d{10}\b|\b0[789][01]\d{8}\b|\+?234\s?\d|\baccount\s+(number|name|no)\b|\b(gtb|gtbank|uba|opay|palmpay|moniepoint|kuda)\b|\b(zenith|access|first|fidelity|wema|sterling|union|polaris|keystone|stanbic)\s+bank\b/i;
+// "Praise 12.07.2026", "Choir Ministration-19-7-2026": a dated service set,
+// several songs under one title, not a song of its own.
+const DATED = /\b\d{1,2}\s*[.\-/:]\s*\d{1,2}\s*[.\-/:]\s*\d{2,4}\b/;
 const SCRIPTURE_REF = /\b(?:[1-3]\s?)?[A-Z][a-z]+\.?\s\d{1,3}:\d{1,3}/g;
 
 /** Why this doesn't look like a song, or null when it does. */
@@ -29,6 +32,7 @@ export function notSongReason(song: ReviewSong): string | null {
   if (MONEY_OR_PHONE.test(text) || MONEY_OR_PHONE.test(song.title)) return "Has an account or phone number";
   if (PERSON_TITLE.test(song.title.trim())) return "Looks like an introduction of a person";
   if (TITLE_NOT_SONG.test(song.title)) return "Title sounds like an announcement or notes";
+  if (DATED.test(song.title)) return "A dated service set (several songs), not one song";
   if ((text.match(SCRIPTURE_REF) ?? []).length >= 2) return "Mostly Bible references";
   const lines = text.split("\n").filter(Boolean);
   if (lines.length && text.length / lines.length > 110) return "Reads like paragraphs, not lyrics";
@@ -71,4 +75,43 @@ export function nearCopies(songs: ReviewSong[]): number[] {
     }
   }
   return keepOf;
+}
+
+const phraseSet = (texts: string[]) => {
+  const w = texts.flatMap((t) => words(t));
+  const out = new Set<string>();
+  for (let i = 0; i + 2 < w.length; i++) out.add(`${w[i]} ${w[i + 1]} ${w[i + 2]}`);
+  return out;
+};
+
+/**
+ * For each song, the title of the library song it's already there as, or
+ * null. The same song saved again with small changes (a line split
+ * differently, a typo fixed) still counts: most of the smaller one's
+ * phrases (three words in a row) are in the other.
+ */
+export function alreadyIn(songs: ReviewSong[], library: { title: string; body: string }[]): (string | null)[] {
+  // Which library songs each phrase is in.
+  const where = new Map<string, number[]>();
+  const sizes = library.map((l, li) => {
+    const set = phraseSet([l.body]);
+    for (const p of set) {
+      const list = where.get(p);
+      if (list) list.push(li);
+      else where.set(p, [li]);
+    }
+    return set.size;
+  });
+  return songs.map((s) => {
+    const mine = phraseSet(s.slides.map((sl) => sl.text));
+    if (!mine.size) return null;
+    const hits = new Map<number, number>();
+    for (const p of mine) for (const li of where.get(p) ?? []) hits.set(li, (hits.get(li) ?? 0) + 1);
+    let best: { li: number; share: number } | null = null;
+    for (const [li, n] of hits) {
+      const share = n / Math.min(mine.size, sizes[li] || 1);
+      if (share >= 0.7 && (!best || share > best.share)) best = { li, share };
+    }
+    return best ? library[best.li].title : null;
+  });
 }
