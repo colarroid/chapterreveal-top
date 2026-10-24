@@ -85,12 +85,11 @@ const phraseSet = (texts: string[]) => {
 };
 
 /**
- * For each song, the title of the library song it's already there as, or
- * null. The same song saved again with small changes (a line split
+ * For each song, the library song it's already there as, or null. The same song saved again with small changes (a line split
  * differently, a typo fixed) still counts: most of the smaller one's
  * phrases (three words in a row) are in the other.
  */
-export function alreadyIn(songs: ReviewSong[], library: { title: string; body: string }[]): (string | null)[] {
+export function alreadyIn<T extends { title: string; body: string }>(songs: ReviewSong[], library: T[]): (T | null)[] {
   // Which library songs each phrase is in.
   const where = new Map<string, number[]>();
   const sizes = library.map((l, li) => {
@@ -112,6 +111,6 @@ export function alreadyIn(songs: ReviewSong[], library: { title: string; body: s
       const share = n / Math.min(mine.size, sizes[li] || 1);
       if (share >= 0.7 && (!best || share > best.share)) best = { li, share };
     }
-    return best ? library[best.li].title : null;
+    return best ? library[best.li] : null;
   });
 }

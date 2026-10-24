@@ -4,6 +4,7 @@ import { FileUp, GitCompare, LoaderCircle, Music, Pencil, Plus, Trash2, X } from
 import { useRouter } from "next/navigation";
 import { memo, useEffect, useMemo, useRef, useState } from "react";
 import { confirmDialog } from "@/components/confirm";
+import { Dropdown } from "@/components/dropdown";
 import { PageHead, SearchBox } from "@/components/page-head";
 import { SongEditor, type SongFields } from "@/components/song-editor";
 import { Button, Chip, IconButton, Notice } from "@/components/ui";
@@ -21,15 +22,15 @@ export interface SharedSong {
   author: string;
   firstLine: string;
   source: string;
-  /** The church that added it; null for the public library. */
-  church: string | null;
+  /** The churches that have it in their library. */
+  churches: string[];
 }
 
-type Which = "all" | "shared" | "churches";
+type Which = "all" | "used" | "unused";
 const WHICH: { value: Which; label: string }[] = [
   { value: "all", label: "All" },
-  { value: "shared", label: "Public library" },
-  { value: "churches", label: "Churches' songs" },
+  { value: "used", label: "In a church's library" },
+  { value: "unused", label: "In none" },
 ];
 
 interface FullSong extends SongFields {
@@ -51,10 +52,10 @@ export function Lyrics({ songs, reviews }: { songs: SharedSong[]; reviews: SongR
   const [query, setQuery] = useState("");
   const [lyricHits, setLyricHits] = useState<Set<string> | null>(null);
   const [which, setWhich] = useState<Which>("all");
-  const shown = useMemo(() => (which === "all" ? songs : songs.filter((s) => (which === "shared" ? !s.church : !!s.church))), [songs, which]);
-  const churchSongs = songs.filter((s) => s.church).length;
+  const shown = useMemo(() => (which === "all" ? songs : songs.filter((s) => (which === "used") === s.churches.length > 0)), [songs, which]);
+  const used = songs.filter((s) => s.churches.length > 0).length;
 
-  const folded = useMemo(() => shown.map((s) => ({ s, key: fold(`${s.title} ${s.author} ${s.firstLine} ${s.church ?? ""}`) })), [shown]);
+  const folded = useMemo(() => shown.map((s) => ({ s, key: fold(`${s.title} ${s.author} ${s.firstLine} ${s.churches.join(" ")}`) })), [shown]);
 
   // Titles here as you type; every song's words on the server after a pause.
   useEffect(() => {
@@ -95,7 +96,7 @@ export function Lyrics({ songs, reviews }: { songs: SharedSong[]; reviews: SongR
     <div className="space-y-4">
       <PageHead
         title="Lyrics"
-        description={`${songs.length.toLocaleString()} ${songs.length === 1 ? "song" : "songs"} on the platform: ${(songs.length - churchSongs).toLocaleString()} in the public library, ${churchSongs.toLocaleString()} in churches' own libraries. Churches search the public library and copy what they need.`}
+        description={`${songs.length.toLocaleString()} ${songs.length === 1 ? "song" : "songs"} in ReedArk, each once; ${used.toLocaleString()} in at least one church's library. Detection listens for every song; churches add the ones they sing.`}
         right={
           <div className="flex gap-2">
             <Button variant={reviews.length ? "primary" : "secondary"} onClick={() => setPane({ kind: "review" })}>
@@ -144,7 +145,7 @@ export function Lyrics({ songs, reviews }: { songs: SharedSong[]; reviews: SongR
             <SongView
               key={pane.id}
               id={pane.id}
-              church={songs.find((s) => s.id === pane.id)?.church ?? null}
+              churches={songs.find((s) => s.id === pane.id)?.churches ?? []}
               onEdit={(song) => setPane({ kind: "edit", song })}
               onDeleted={() => {
                 setPane({ kind: "empty" });
@@ -156,7 +157,7 @@ export function Lyrics({ songs, reviews }: { songs: SharedSong[]; reviews: SongR
             <SongEditor
               key={pane.song?.id ?? "new"}
               initial={pane.song}
-              heading={pane.song ? "Edit public song" : "Add a public song"}
+              heading={pane.song ? "Edit song" : "Add a song"}
               onCancel={() => setPane(pane.song ? { kind: "view", id: pane.song.id } : { kind: "empty" })}
               onSave={(f) => save(f, pane.song)}
             />
@@ -186,7 +187,11 @@ const Row = memo(function Row({ song, active, onOpen }: { song: SharedSong; acti
       <button type="button" onClick={onOpen} className={`block w-full rounded-md px-3 py-2 text-left transition ${active ? "bg-surface-3" : "hover:bg-surface-2"}`}>
         <span className="flex items-center gap-2">
           <span className="min-w-0 flex-1 truncate text-[15px] font-semibold">{song.title}</span>
-          {song.church && <span className="max-w-32 shrink-0 truncate text-[10px] font-bold tracking-wider text-faint uppercase">{song.church}</span>}
+          {song.churches.length > 0 && (
+            <span className="max-w-32 shrink-0 truncate text-[10px] font-bold tracking-wider text-faint uppercase" title={song.churches.join(", ")}>
+              {song.churches.length === 1 ? song.churches[0] : `${song.churches.length} churches`}
+            </span>
+          )}
         </span>
         <span className="block truncate text-xs text-muted">{song.firstLine || song.author || " "}</span>
       </button>
@@ -208,8 +213,8 @@ function loadSong(id: string): Promise<FullSong | null> {
   return p;
 }
 
-/** `church`: the church that added it (its songs are theirs: read here, not edited); null for the public library. */
-function SongView({ id, church, onEdit, onDeleted }: { id: string; church: string | null; onEdit: (s: FullSong) => void; onDeleted: () => void }) {
+/** `churches`: the churches that have it in their library. */
+function SongView({ id, churches, onEdit, onDeleted }: { id: string; churches: string[]; onEdit: (s: FullSong) => void; onDeleted: () => void }) {
   const [song, setSong] = useState<FullSong | null | undefined>(undefined);
   const [deleting, setDeleting] = useState(false);
   useEffect(() => {
@@ -224,7 +229,9 @@ function SongView({ id, church, onEdit, onDeleted }: { id: string; church: strin
     if (!song) return;
     const ok = await confirmDialog({
       title: `Delete "${song.title}"?`,
-      body: "It's removed from the public library. Churches that copied it keep their copies. This can't be undone.",
+      body: churches.length
+        ? `It's removed from ReedArk and from the libraries of ${churches.join(", ")}. This can't be undone.`
+        : "It's removed from ReedArk. This can't be undone.",
       confirmLabel: "Delete",
       danger: true,
     });
@@ -251,19 +258,14 @@ function SongView({ id, church, onEdit, onDeleted }: { id: string; church: strin
           <h2 className="text-xl leading-tight font-bold">{song.title}</h2>
           <p className="mt-1 text-sm text-muted">{[song.author, song.ccli_number && `CCLI ${song.ccli_number}`, `${song.slides.length} slides`].filter(Boolean).join(" · ")}</p>
           {song.copyright && <p className="mt-0.5 text-xs text-faint">{song.copyright}</p>}
+          <p className="mt-1.5 text-xs text-muted">{churches.length ? `In the library of ${churches.join(", ")}` : "In no church's library yet"}</p>
         </div>
-        {church ? (
-          <Chip>Added by {church}</Chip>
-        ) : (
-          <>
-            <Button variant="secondary" size="sm" onClick={() => onEdit(song)}>
-              <Pencil size={13} /> Edit
-            </Button>
-            <IconButton label="Delete song" onClick={remove} disabled={deleting} className="hover:text-negative">
-              {deleting ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}
-            </IconButton>
-          </>
-        )}
+        <Button variant="secondary" size="sm" onClick={() => onEdit(song)}>
+          <Pencil size={13} /> Edit
+        </Button>
+        <IconButton label="Delete song" onClick={remove} disabled={deleting} className="hover:text-negative">
+          {deleting ? <LoaderCircle size={16} className="animate-spin" /> : <Trash2 size={16} />}
+        </IconButton>
       </div>
       <ol className="grid min-h-0 flex-1 auto-rows-min grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-2 overflow-y-auto p-4">
         {song.slides.map((s, i) => (
@@ -297,6 +299,8 @@ interface ReviewItem {
   copyOf: string | null;
   /** The public library song it's already there as (perhaps with small changes). */
   inLibrary: string | null;
+  /** …and that public song's id, for copying it into a church's library. */
+  libraryId: string | null;
   include: boolean;
 }
 
@@ -305,13 +309,13 @@ type ReviewView = "import" | "not-songs" | "library" | "copies";
 const PAGE = 1000;
 
 /** Every public library song's title and words, to check an import against. */
-async function publicLibrary(): Promise<{ title: string; body: string }[]> {
+async function publicLibrary(): Promise<{ id: string; title: string; body: string }[]> {
   const supabase = supabaseBrowser();
-  const out: { title: string; body: string }[] = [];
+  const out: { id: string; title: string; body: string }[] = [];
   for (let from = 0; ; from += PAGE) {
-    const { data, error } = await supabase.from("songs").select("title, body").is("church_id", null).order("id").range(from, from + PAGE - 1);
+    const { data, error } = await supabase.from("songs").select("id, title, body").is("church_id", null).order("id").range(from, from + PAGE - 1);
     if (error) throw error;
-    out.push(...((data ?? []) as { title: string; body: string }[]));
+    out.push(...((data ?? []) as { id: string; title: string; body: string }[]));
     if (!data || data.length < PAGE) return out;
   }
 }
@@ -323,10 +327,18 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
   const [problems, setProblems] = useState<string[]>([]);
   const [reading, setReading] = useState(false);
   const [pair, setPair] = useState(true);
+  // A church to also get these songs in its own library (its songbook being imported).
+  const [churches, setChurches] = useState<{ id: string; name: string }[]>([]);
+  const [forChurch, setForChurch] = useState("");
+  useEffect(() => {
+    void supabaseBrowser()
+      .rpc("admin_churches")
+      .then(({ data }) => setChurches(((data ?? []) as { id: string; name: string }[]).sort((a, b) => a.name.localeCompare(b.name))));
+  }, []);
   const [view, setView] = useState<ReviewView>("import");
   const [query, setQuery] = useState("");
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [result, setResult] = useState<{ added: number; skipped: number } | null>(null);
+  const [result, setResult] = useState<{ added: number; skipped: number; toChurch: number; church: string | null } | null>(null);
   const [error, setError] = useState("");
   const [dragging, setDragging] = useState(false);
   // Ask before a refresh or close cuts off the import.
@@ -351,7 +363,7 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
     const all = ok.flatMap((b) => b.songs.map((song) => ({ song, book: b.name })));
     const keep = nearCopies(all.map((x) => x.song));
     // Songs the public library has already, saved again with small changes.
-    let there: (string | null)[] = all.map(() => null);
+    let there: ({ id: string; title: string } | null)[] = all.map(() => null);
     try {
       there = alreadyIn(
         all.map((x) => x.song),
@@ -363,9 +375,11 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
     setItems(
       all.map(({ song, book }, i) => {
         const notSong = notSongReason(song);
-        const inLibrary = notSong ? null : there[i];
+        const match = notSong ? null : there[i];
+        const inLibrary = match?.title ?? null;
+        const libraryId = match?.id ?? null;
         const copyOf = keep[i] !== i ? all[keep[i]].song.title : null;
-        return { song, book, notSong, copyOf, inLibrary, include: !notSong && !copyOf && !inLibrary };
+        return { song, book, notSong, copyOf, inLibrary, libraryId, include: !notSong && !copyOf && !inLibrary };
       }),
     );
     setBooks(ok);
@@ -434,8 +448,30 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
       added += data?.length ?? 0;
       setProgress({ done: Math.min(i + BATCH, rows.length), total: rows.length });
     }
+    // The church's copies: the songs just imported (or there already with the
+    // same fingerprint), and the ones the library had under other words.
+    let toChurch = 0;
+    if (forChurch) {
+      const ids = new Set(items.filter((x) => x.libraryId && !x.notSong).map((x) => x.libraryId!));
+      const prints = rows.map((r) => r.fingerprint).filter((f): f is string => !!f);
+      for (let i = 0; i < prints.length; i += BATCH) {
+        const { data } = await supabase.from("songs").select("id").is("church_id", null).in("fingerprint", prints.slice(i, i + BATCH));
+        for (const r of data ?? []) ids.add(r.id as string);
+      }
+      const all = [...ids];
+      for (let i = 0; i < all.length; i += BATCH) {
+        const { data, error } = await supabase.rpc("admin_tag_church", { p_church: forChurch, p_songs: all.slice(i, i + BATCH) });
+        if (error) {
+          setProgress(null);
+          setError(/admin_tag_church/.test(error.message) ? "Adding to the church needs migration 0037." : error.message);
+          onDone();
+          return;
+        }
+        toChurch += Number(data ?? 0);
+      }
+    }
     setProgress(null);
-    setResult({ added, skipped: rows.length - added });
+    setResult({ added, skipped: rows.length - added, toChurch, church: churches.find((c) => c.id === forChurch)?.name ?? null });
     setBooks([]);
     setItems([]);
     onDone();
@@ -576,7 +612,23 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
                 </span>
               </span>
             </label>
-            <Button onClick={() => void run()} loading={progress !== null} disabled={!counts.import}>
+            <div className="flex flex-wrap items-center gap-3 rounded-lg bg-surface-2 px-4 py-3 text-sm">
+              <span className="min-w-0 flex-1">
+                <span className="block font-bold">Also add to a church&apos;s library</span>
+                <span className="mt-0.5 block text-muted">
+                  Its songbook: the songs go in its library, the new ones and the ones ReedArk had already. No copies of the words.
+                </span>
+              </span>
+              <Dropdown
+                ariaLabel="Church"
+                searchable
+                value={forChurch}
+                onChange={setForChurch}
+                options={[{ value: "", label: "No church" }, ...churches.map((c) => ({ value: c.id, label: c.name }))]}
+                className="h-10 w-64 text-sm"
+              />
+            </div>
+            <Button onClick={() => void run()} loading={progress !== null} disabled={!counts.import && !forChurch}>
               {progress ? `Importing ${progress.done.toLocaleString()} of ${progress.total.toLocaleString()}` : `Import ${counts.import.toLocaleString()} songs`}
             </Button>
           </div>
@@ -585,8 +637,9 @@ function ImportPanel({ onClose, onDone }: { onClose: () => void; onDone: () => v
         {error && <Notice tone="error">{error}</Notice>}
         {result && (
           <Notice tone="ok">
-            Added {result.added.toLocaleString()} {result.added === 1 ? "song" : "songs"} to the public library.
+            Added {result.added.toLocaleString()} {result.added === 1 ? "song" : "songs"} to ReedArk.
             {result.skipped > 0 && ` ${result.skipped.toLocaleString()} were already there.`}
+            {result.church && ` ${result.toChurch.toLocaleString()} added to ${result.church}'s library.`}
           </Notice>
         )}
       </div>

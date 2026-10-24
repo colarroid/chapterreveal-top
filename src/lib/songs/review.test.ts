@@ -22,7 +22,7 @@ describe("alreadyIn", () => {
   ];
   it("finds a song already in the library, even with its lines split differently", () => {
     const again = { title: "Waymaker", slides: [{ text: "Way maker, miracle worker" }, { text: "Promise keeper, light in the darkness\nMy God, that is who you are" }] };
-    expect(alreadyIn([again], library)).toEqual(["Way Maker"]);
+    expect(alreadyIn([again], library)[0]?.title).toBe("Way Maker");
   });
   it("leaves a new song alone", () => {
     const fresh = { title: "Goodness of God", slides: [{ text: "I love you Lord, oh your mercy never fails me" }] };
